@@ -3,7 +3,9 @@ package main
 import (
 	"flag"
 	"os"
-	"path/filepath"
+	_ "path/filepath"
+
+	"httpgo"
 )
 
 var (
@@ -34,4 +36,6 @@ func main() {
 			LogFatal("cannot open XML file: " + xml)
 		}
 	}
+
+	// TODO(ymotongpoo): call httpgo.ParseArgs()
 }
