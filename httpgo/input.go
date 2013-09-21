@@ -23,6 +23,46 @@ var (
 	sepGroupItems = []string{SepDataRawJSON, SepQuery, SepHeaders, SepData, SepFiles}
 )
 
+type ParsedArgs struct {
+	Header   *http.Header
+	URLParam url.Values
+	Data     map[string]string
+	JSON     map[string]interface{}
+	File     string
+}
+
+// ParseArgs parses arguments without flags and return values in following order:
+//
+//     * HTTP Method
+//     * URL
+//     * Required data
+//     * error
+func ParseArgs(args []string, form bool) (string, string, *ParsedArgs, error) {
+	if len(args) < 1 {
+		return "", "", nil, errors.New("")
+	}
+
+	switch len(args) {
+	case 1:
+		return "GET", args[0], &ParsedArgs{}, nil
+	case 2:
+		return args[0], args[1], &ParsedArgs{}, nil
+	default:
+		parsedArgs := ParseItems(args[2:])
+		return args[0], args[1], parsedArgs, nil
+	}
+}
+
+func ParseItems(args []string) (*ParsedArgs, error) {
+	var header *http.Header
+	var param url.Values
+	for _, arg := range args {
+		kv := NewKeyValue(arg)
+		kv.Parse()
+		// TODO(ymotongpoo): Implement function to fill kv data into ParsedArgs.
+	}
+}
+
 // tokenized is struct used during parsing an argument.
 type tokenized struct {
 	data    []byte
@@ -36,8 +76,14 @@ type KeyValue struct {
 	Orig  string
 }
 
-func (kv KeyValue) Parse(arg string, separators []string) {
-	tokens := tokenizer(arg)
+func NewKeyValue(arg string) *KeyValue {
+	return &KeyValue{
+		Orig: arg,
+	}
+}
+
+func (kv *KeyValue) Parse(separators []string) {
+	tokens := tokenizer(kv.Orig)
 	for i, t := range tokens {
 		if t.escaped {
 			continue
@@ -60,7 +106,6 @@ func (kv KeyValue) Parse(arg string, separators []string) {
 			kv.Key = string(bytes.Join(keyTokens, ""))
 			kv.Value = string(value) + string(bytes.Join(valueTokens, ""))
 			kv.Sep = separator
-			kv.Orig = arg
 			return
 		}
 	}
