@@ -28,7 +28,7 @@ type ParsedArgs struct {
 	URLParam url.Values
 	Data     map[string]string
 	JSON     map[string]interface{}
-	File     string
+	File     map[string][]byte
 }
 
 // ParseArgs parses arguments without flags and return values in following order:
@@ -38,29 +38,46 @@ type ParsedArgs struct {
 //     * Required data
 //     * error
 func ParseArgs(args []string, form bool) (string, string, *ParsedArgs, error) {
-	if len(args) < 1 {
-		return "", "", nil, errors.New("")
-	}
-
 	switch len(args) {
+	case 0:
+		return "", "", nil, errors.New("One argument is required")
 	case 1:
 		return "GET", args[0], &ParsedArgs{}, nil
 	case 2:
 		return args[0], args[1], &ParsedArgs{}, nil
 	default:
-		parsedArgs := ParseItems(args[2:])
+		parsedArgs, err := ParseItems(args[2:])
+		if err != nil {
+			return "", "", nil, err
+		}
 		return args[0], args[1], parsedArgs, nil
 	}
 }
 
+// ParseItems parses all ITEMs in args and returns ParsedArgs for HTTP requesst.
 func ParseItems(args []string) (*ParsedArgs, error) {
-	var header *http.Header
-	var param url.Values
+	pa := &ParseArgs{}
 	for _, arg := range args {
 		kv := NewKeyValue(arg)
 		kv.Parse()
 		// TODO(ymotongpoo): Implement function to fill kv data into ParsedArgs.
+
+		switch kv.Sep {
+		case SepHeaders:
+			pa.Header.Add(kv.Key, kv.Value)
+		case SepQuery:
+			pa.URLParam.Add(kv.Key, kv.Value)
+		case SepFiles:
+			value, err := ioutil.ReadFile(kv.Value)
+			if err != nil {
+				return nil, err
+			}
+			pa.Files[kv.Key] = value
+		case SepData, SepDataRawJSON:
+			pa.Data[kv.Key] = kv.Value
+		}
 	}
+	return pa, nil
 }
 
 // tokenized is struct used during parsing an argument.
