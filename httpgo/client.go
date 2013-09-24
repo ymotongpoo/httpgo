@@ -15,7 +15,7 @@ const (
 	DefaultUA = "HTTPgo/" + Version
 )
 
-func CreateHTTPRequest(method, urlStr string, pa *ParseArgs) (http.Request, error) {
+func CreateHTTPRequest(method, urlStr string, pa *ParsedArgs, formFlag bool) (http.Request, error) {
 	var req *http.Request
 	switch method {
 	case "GET":
@@ -24,17 +24,38 @@ func CreateHTTPRequest(method, urlStr string, pa *ParseArgs) (http.Request, erro
 			return nil, err
 		}
 	case "POST", "PUT", "DELETE", "HEAD":
-		req, err = http.NewRequest(methdd, urlStr, nil)
+		var err error
+		if formFlag {
+			req, err = http.NewRequest(methdd, urlStr, nil)
+			req.Form = pa.URLValues
+		} else {
+			body, err = makeRequestBody(pa)
+			req, err = http.NewRequest(method, urlStr, body)
+		}
+
 		if err != nil {
 			return nil, err
 		}
-		req.Form = pa.URLValues
+
 	}
 	req.Header = *pa.Header
+	addHTTPgoHeaders(req, formFlag)
 }
 
-func addHTTPgoHeaders(req *http.Request) {
+func addHTTPgoHeaders(req *http.Request, formFlag bool) {
 	if req.Header.Get("User-Agent") == "" {
 		req.Header.Set("User-Agent", DefaultUA)
 	}
+
+	contentType := Json
+	if formFlag {
+		contentType = Form
+	}
+	if req.Header.Get("Content-Type") == "" {
+		req.Header.Set("Content-Type", contentType)
+	}
+}
+
+func makeRequestBody(pa *ParsedArgs) (*io.Reader, error) {
+	// TODO(ymotongpoo): Implement conversion from map to JSON.
 }
