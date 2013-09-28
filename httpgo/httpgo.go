@@ -1,7 +1,6 @@
 package httpgo
 
 import (
-	"fmt"
 	"log"
 )
 

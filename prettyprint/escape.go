@@ -4,9 +4,9 @@
 package prettyprint
 
 import (
-	"bytes"
-	"io"
-	"os"
+	_ "bytes"
+	_ "io"
+	_ "os"
 	"strconv"
 )
 
@@ -53,17 +53,17 @@ var operationMap = map[string]string{
 }
 
 func CUU(n int) []byte {
-	return ESC + "[" + strconv.Itoa(n) + operationMap["up"]
+	return []byte(ESC + "[" + strconv.Itoa(n) + operationMap["up"])
 }
 
-func CUD(n int) string {
-	return ESC + "[" + strconv.Itoa(n) + operationMap["down"]
+func CUD(n int) []byte {
+	return []byte(ESC + "[" + strconv.Itoa(n) + operationMap["down"])
 }
 
-func CUF(n int) string {
-	return ESC + "[" + strconv.Itoa(n) + operationMap["forward"]
+func CUF(n int) []byte {
+	return []byte(ESC + "[" + strconv.Itoa(n) + operationMap["forward"])
 }
 
-func CUB(n int) string {
-	return ESC + "[" + strconv.Itoa(n) + operationMap["back"]
+func CUB(n int) []byte {
+	return []byte(ESC + "[" + strconv.Itoa(n) + operationMap["back"])
 }

@@ -2,7 +2,11 @@ package httpgo
 
 import (
 	"bytes"
-	"reflect"
+	"errors"
+	"io/ioutil"
+	"net/http"
+	"net/url"
+	_ "reflect"
 )
 
 // Various separators used in args.
@@ -27,8 +31,14 @@ type ParsedArgs struct {
 	Header   *http.Header
 	URLParam url.Values
 	Data     map[string]string
-	JSON     map[string]interface{}
+	JSON     string
 	File     map[string][]byte
+}
+
+func NewParsedArgs() *ParsedArgs {
+	return &ParsedArgs{
+		Header: &http.Header{},
+	}
 }
 
 // ParseArgs parses arguments without flags and return values in following order:
@@ -37,14 +47,14 @@ type ParsedArgs struct {
 //     * URL
 //     * Required data
 //     * error
-func ParseArgs(args []string, form bool) (string, string, *ParsedArgs, error) {
+func ParseArgs(args []string) (string, string, *ParsedArgs, error) {
 	switch len(args) {
 	case 0:
 		return "", "", nil, errors.New("One argument is required")
 	case 1:
-		return "GET", args[0], &ParsedArgs{}, nil
+		return "GET", args[0], NewParsedArgs(), nil
 	case 2:
-		return args[0], args[1], &ParsedArgs{}, nil
+		return args[0], args[1], NewParsedArgs(), nil
 	default:
 		parsedArgs, err := ParseItems(args[2:])
 		if err != nil {
@@ -56,10 +66,10 @@ func ParseArgs(args []string, form bool) (string, string, *ParsedArgs, error) {
 
 // ParseItems parses all ITEMs in args and returns ParsedArgs for HTTP requesst.
 func ParseItems(args []string) (*ParsedArgs, error) {
-	pa := &ParseArgs{}
+	pa := &ParsedArgs{}
 	for _, arg := range args {
 		kv := NewKeyValue(arg)
-		kv.Parse()
+		kv.Parse(sepGroupItems)
 		// TODO(ymotongpoo): Implement function to fill kv data into ParsedArgs.
 
 		switch kv.Sep {
@@ -72,7 +82,7 @@ func ParseItems(args []string) (*ParsedArgs, error) {
 			if err != nil {
 				return nil, err
 			}
-			pa.Files[kv.Key] = value
+			pa.File[kv.Key] = value
 		case SepData, SepDataRawJSON:
 			pa.Data[kv.Key] = kv.Value
 		}
@@ -100,7 +110,7 @@ func NewKeyValue(arg string) *KeyValue {
 }
 
 func (kv *KeyValue) Parse(separators []string) {
-	tokens := tokenizer(kv.Orig)
+	tokens := tokenize([]byte(kv.Orig))
 	for i, t := range tokens {
 		if t.escaped {
 			continue
@@ -108,20 +118,22 @@ func (kv *KeyValue) Parse(separators []string) {
 
 		var separator string
 		for _, sep := range separators {
-			if pos := bytes.Index(t.data, sep); pos != -1 {
+			if pos := bytes.Index(t.data, []byte(sep)); pos != -1 {
 				separator = sep
 				break
 			}
 		}
 		if separator != "" {
-			key, value := bytes.Split(token, sep)
+			splitted := bytes.SplitN(t.data, []byte(separator), 2)
+			key := splitted[0]
+			value := splitted[1]
 
-			keyTokens := tokenizedData(token[:i])
+			keyTokens := tokenizedData(tokens[:i])
 			keyTokens = append(keyTokens, key)
-			valueTokens := tokenizedData(token[i+1:])
+			valueTokens := tokenizedData(tokens[i+1:])
 
-			kv.Key = string(bytes.Join(keyTokens, ""))
-			kv.Value = string(value) + string(bytes.Join(valueTokens, ""))
+			kv.Key = string(bytes.Join(keyTokens, []byte("")))
+			kv.Value = string(value) + string(bytes.Join(valueTokens, []byte("")))
 			kv.Sep = separator
 			return
 		}
@@ -149,7 +161,6 @@ func tokenize(s []byte) []tokenized {
 	tokens := []tokenized{tokenized{}}
 	esc := false
 	for _, b := range s {
-		fmt.Println("parsing: ", b, " ", string(b))
 		if esc {
 			tokens = append(tokens, tokenized{[]byte{b}, true})
 			tokens = append(tokens, tokenized{})
